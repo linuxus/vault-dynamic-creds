@@ -37,9 +37,13 @@ Configure Vault's Kubernetes authentication:
 # Enable Kubernetes auth backend
 vault auth enable kubernetes
 
-# Configure Kubernetes endpoint
+# Get the Kubernetes API server address
+# Make sure you're authenticated against your EKS cluster
+API_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+
+# Configure Vault
 vault write auth/kubernetes/config \
-  kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"
+  kubernetes_host="$API_SERVER"
 
 # Create a Vault policy for database access
 vault policy write acme-demo-policy - <<EOF
