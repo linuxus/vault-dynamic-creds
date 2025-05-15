@@ -6,7 +6,6 @@ This repository contains an application that demonstrates using HashiCorp Vault'
 
 - Kubernetes cluster (e.g., AWS EKS)
 - HashiCorp Vault server already deployed
-- Vault Secret Operator installed
 - PostgreSQL database (e.g., AWS RDS)
 
 ## Architecture
@@ -19,17 +18,103 @@ The application uses the following components:
 4. **Python Application**: Uses credentials to connect to PostgreSQL
 5. **Streamlit UI**: Displays the connection status and credential information
 
-## Features
-
-- Dynamic credential generation with automatic rotation
-- Real-time monitoring of credential status and expiration
-- Visual feedback when credentials are rotated
-- Kubernetes-native deployment
-- Streamlit web interface
-
 ## Setup Instructions
 
-### 1. Set up Vault Authentication
+### 1. Installing Vault Secret Operator CRDs
+
+Before deploying the application, you need to install the Vault Secret Operator Custom Resource Definitions (CRDs) in your Kubernetes cluster:
+
+#### Helm Installation (Recommended Method)
+
+The primary method to install Vault Secret Operator with its CRDs is using Helm:
+
+```bash
+# Add the HashiCorp Helm repository
+helm repo add hashicorp https://helm.releases.hashicorp.com
+helm repo update
+
+# Create the namespace for VSO
+kubectl create namespace vault-secrets-operator-system
+
+# Install Vault Secret Operator with your vso-values.yaml
+helm install vault-secrets-operator hashicorp/vault-secrets-operator \
+    -n vault-secrets-operator-system \
+    --create-namespace \
+    --values vso-values.yaml
+```
+
+#### Verification Steps
+
+After installation, verify that the CRDs are properly installed:
+
+```bash
+kubectl get crds | grep vault
+```
+
+You should see CRDs like:
+```
+vaultauths.secrets.hashicorp.com                     2025-05-15T04:54:33Z
+vaultconnections.secrets.hashicorp.com               2025-05-15T04:54:33Z
+vaultdynamicsecrets.secrets.hashicorp.com            2025-05-15T04:54:33Z
+vaultpkisecrets.secrets.hashicorp.com                2025-05-15T04:54:33Z
+vaultstaticsecrets.secrets.hashicorp.com             2025-05-15T04:54:33Z
+```
+
+Also check that the operator pods are running:
+
+```bash
+kubectl get pods -n vault-secrets-operator-system
+```
+
+You should see output like:
+```
+NAME                                                        READY   STATUS    RESTARTS   AGE
+vault-secrets-operator-controller-manager-d6f5df6c7-xj5jf   2/2     Running   0          5m
+```
+
+#### Manual Installation (Alternative Method)
+
+If the Helm installation doesn't work, you can install the CRDs manually:
+
+```bash
+# Clone the Vault Secret Operator repository
+git clone https://github.com/hashicorp/vault-secrets-operator.git
+cd vault-secrets-operator
+
+# Install the CRDs directly
+kubectl apply -f config/crd/bases/
+```
+
+Then install the operator without CRDs:
+
+```bash
+helm install vault-secrets-operator hashicorp/vault-secrets-operator \
+    -n vault-secrets-operator-system \
+    --create-namespace \
+    --set "installCRDs=false" \
+    --values vso-values.yaml
+```
+
+#### Troubleshooting Installation
+
+If you encounter issues:
+
+1. Check Helm installation status:
+   ```bash
+   helm list -n vault-secrets-operator-system
+   ```
+
+2. Check for errors in the operator logs:
+   ```bash
+   kubectl logs -n vault-secrets-operator-system -l app.kubernetes.io/name=vault-secrets-operator
+   ```
+
+3. Verify CRD installation:
+   ```bash
+   kubectl api-resources | grep vault
+   ```
+
+### 2. Set up Vault Authentication
 
 Configure Vault's Kubernetes authentication:
 
@@ -56,7 +141,7 @@ vault write auth/kubernetes/role/acme-demo-role \
   ttl=1h
 ```
 
-### 2. Set up Database Secrets Engine
+### 3. Set up Database Secrets Engine
 
 ```bash
 # Enable database secrets engine
@@ -79,7 +164,7 @@ vault write database/roles/acme-demo-role \
   max_ttl="24h"
 ```
 
-### 3. Deploy the Application
+### 4. Deploy the Application
 
 Once Vault and the Vault Secret Operator are properly configured, deploy the application:
 
@@ -105,7 +190,7 @@ kubectl get pods -n acme-demo
 kubectl logs -n acme-demo -l app=acme-demo
 ```
 
-### 4. Access the Application
+### 5. Access the Application
 
 The application will be available via:
 
@@ -114,25 +199,11 @@ The application will be available via:
 
 You can access the UI and test the PostgreSQL connection.
 
-## Docker Image
-
-The repository includes a Dockerfile to build your own image:
-
-```bash
-docker build -t your-repo/postgres-vault-app:latest .
-```
-
-Or use the provided base image:
-
-```yaml
-image: amancevice/pandas:1.3.0-slim
-```
-
 ## How It Works
 
 1. The VaultDynamicSecret resource requests credentials from Vault
 2. Vault generates time-limited PostgreSQL credentials
-3. Vault Secret Operator creates/updates a Kubernetes Secret
+3. VSO creates a Kubernetes Secret with these credentials
 4. The application pod uses these credentials to connect to PostgreSQL
 5. Before credentials expire, VSO requests new credentials
 6. When credentials are updated, the deployment is automatically restarted
@@ -174,6 +245,16 @@ If the application can't connect to PostgreSQL:
    apt-get update && apt-get install -y netcat
    nc -zv <rds-endpoint> 5432
    ```
+
+### Viewing Logs
+
+```bash
+# View Vault Secret Operator logs
+kubectl logs -n vault-secrets-operator-system deploy/vault-secrets-operator-controller-manager
+
+# View application logs
+kubectl logs -n acme-demo deploy/acme-demo
+```
 
 ## Working with Private Subnets
 
@@ -224,16 +305,6 @@ aws ssm start-session \
 
 # In another terminal:
 psql --host=localhost --port=5432 --username=<admin-user> --dbname=<db-name>
-```
-
-### Viewing Logs
-
-```bash
-# View Vault Secret Operator logs
-kubectl logs -n vault-secrets-operator-system deploy/vault-secrets-operator-controller-manager
-
-# View application logs
-kubectl logs -n acme-demo deploy/acme-demo
 ```
 
 ## Security Considerations
