@@ -295,12 +295,12 @@ spec:
         - name: POSTGRES_USERNAME
           valueFrom:
             secretKeyRef:
-              name: acme_admin
+              name: postgres
               key: username
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: pf7E&QvxUJMQFE&j
+              name: postgres
               key: password
         volumeMounts:
         - name: app-code
