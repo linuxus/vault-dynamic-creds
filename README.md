@@ -75,12 +75,13 @@ vault write database/config/acme-demo-pg-db \
   password="vault"
 
 # Create database role
+# Note that ttl and max_ttl are set to 1m for testing purposes but should be set something 1h and 24h respectively.
 vault write database/roles/acme-demo-role \
   db_name="acme-demo-pg-db" \
   creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
       GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
-  default_ttl="1h" \
-  max_ttl="24h"
+  default_ttl="1m" \
+  max_ttl="1m"
 ```
 
 ### 3. Deploy the Application
