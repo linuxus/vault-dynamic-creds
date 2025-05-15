@@ -37,13 +37,9 @@ Configure Vault's Kubernetes authentication:
 # Enable Kubernetes auth backend
 vault auth enable kubernetes
 
-# Get the Kubernetes API server address
-# Make sure you're authenticated against your EKS cluster
-API_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-
-# Configure Vault
+# Configure Kubernetes endpoint
 vault write auth/kubernetes/config \
-  kubernetes_host="$API_SERVER"
+  kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"
 
 # Create a Vault policy for database access
 vault policy write acme-demo-policy - <<EOF
@@ -70,25 +66,43 @@ vault secrets enable database
 vault write database/config/acme-demo-pg-db \
   plugin_name="postgresql-database-plugin" \
   allowed_roles="acme-demo-role" \
-  connection_url="postgresql://{{username}}:{{password}}@postgres-postgresql.postgres:5432/acmedemo" \
+  connection_url="postgresql://{{username}}:{{password}}@postgres-postgresql.postgres:5432/acme-demo" \
   username="vault" \
   password="vault"
 
 # Create database role
-# Note that ttl and max_ttl are set to 1m for testing purposes but should be set something 1h and 24h respectively.
 vault write database/roles/acme-demo-role \
   db_name="acme-demo-pg-db" \
   creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
       GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
-  default_ttl="1m" \
-  max_ttl="1m"
+  default_ttl="1h" \
+  max_ttl="24h"
 ```
 
 ### 3. Deploy the Application
 
+Once Vault and the Vault Secret Operator are properly configured, deploy the application:
+
 ```bash
 # Apply all Kubernetes manifests
 kubectl apply -f kubernetes-manifests.yaml
+```
+
+Verify the deployment:
+
+```bash
+# Check if the VaultAuth and VaultDynamicSecret resources were created
+kubectl get vaultauth -n acme-demo
+kubectl get vaultdynamicsecret -n acme-demo
+
+# Check if the Kubernetes Secret is populated
+kubectl get secret postgres -n acme-demo
+
+# Check if the pod is running
+kubectl get pods -n acme-demo
+
+# Check pod logs for any issues
+kubectl logs -n acme-demo -l app=acme-demo
 ```
 
 ### 4. Access the Application
@@ -127,10 +141,90 @@ image: amancevice/pandas:1.3.0-slim
 
 ### Common Issues
 
-1. **Connection Failure**: Check that the PostgreSQL host is correctly configured and accessible
-2. **Authentication Error**: Ensure the Vault role and policy are properly configured
-3. **Secret Not Found**: Verify that the VaultDynamicSecret resource is correctly configured
-4. **Permission Error**: Check that the service account has the necessary permissions
+#### "No matches for kind" Error when Applying Manifests
+
+If you see errors like:
+```
+resource mapping not found for name: "default" namespace: "acme-demo" from "kubernetes-manifests.yaml": no matches for kind "VaultAuth" in version "secrets.hashicorp.com/v1beta1"
+ensure CRDs are installed first
+```
+
+This means the Custom Resource Definitions for Vault Secret Operator are not installed. Follow the installation instructions in Step 1.
+
+#### Connection Failures
+
+If the application can't connect to PostgreSQL:
+
+1. Verify the Vault Secret Operator logs:
+   ```bash
+   kubectl logs -n vault-secrets-operator-system -l app.kubernetes.io/name=vault-secrets-operator
+   ```
+
+2. Check if the Secret was created and contains credentials:
+   ```bash
+   kubectl get secret postgres -n acme-demo -o yaml
+   ```
+
+3. Verify the bastion host can reach the RDS instance:
+   ```bash
+   # Get into a pod
+   kubectl exec -it -n acme-demo <pod-name> -- bash
+   
+   # Test connection
+   apt-get update && apt-get install -y netcat
+   nc -zv <rds-endpoint> 5432
+   ```
+
+## Working with Private Subnets
+
+If your RDS instance is in a private subnet (as it should be for security), you have several options to access it for initial setup:
+
+### Option 1: Use an EC2 Instance as a Bastion Host
+
+1. Launch an EC2 instance in the same VPC as your RDS
+2. Set up the necessary security groups to allow access to RDS
+3. Use the EC2 instance to create the vault user in PostgreSQL:
+
+```bash
+# Connect to the EC2 instance
+ssh ec2-user@<bastion-ip>
+
+# Install PostgreSQL client
+sudo yum install -y postgresql
+
+# Create the vault user
+psql --host=<rds-endpoint> --port=5432 --username=<admin-user> --dbname=<db-name>
+# Once connected, run:
+CREATE ROLE vault WITH SUPERUSER LOGIN ENCRYPTED PASSWORD 'vault';
+```
+
+### Option 2: Use AWS Systems Manager Session Manager
+
+If your EC2 instances are set up with SSM:
+
+1. Configure VPC endpoints for SSM (ssm, ec2messages, ssmmessages)
+2. Connect to an EC2 instance in the same VPC as RDS:
+
+```bash
+aws ssm start-session --target <instance-id>
+
+# Then create the vault user as shown above
+```
+
+### Option 3: Use Port Forwarding through SSM
+
+For direct access from your local machine:
+
+```bash
+# Start port forwarding
+aws ssm start-session \
+    --target <instance-id> \
+    --document-name AWS-StartPortForwardingSessionToRemoteHost \
+    --parameters "host=<rds-endpoint>,portNumber=5432,localPortNumber=5432"
+
+# In another terminal:
+psql --host=localhost --port=5432 --username=<admin-user> --dbname=<db-name>
+```
 
 ### Viewing Logs
 
@@ -144,12 +238,11 @@ kubectl logs -n acme-demo deploy/acme-demo
 
 ## Security Considerations
 
-- This demo uses a simplified approach for illustration purposes
-- In production:
-  - Use proper secret management with encrypted secrets
-  - Implement network policies to restrict access
-  - Use a dedicated service account with minimal permissions
-  - Configure more restrictive database permissions
+- **Credentials Management**: The vault user created in PostgreSQL should have minimal permissions needed
+- **Network Security**: Keep your RDS in a private subnet and restrict access
+- **Secrets TTL**: Configure appropriate TTL values for credentials (default is 1h in this demo)
+- **IAM Permissions**: Ensure the EC2 instances have only the necessary IAM permissions
+- **Audit Logging**: Enable audit logging in Vault to track credential generation and usage
 
 ## References
 
