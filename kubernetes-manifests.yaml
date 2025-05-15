@@ -291,16 +291,16 @@ spec:
         - name: POSTGRES_PORT
           value: "5432"
         - name: POSTGRES_DB
-          value: "acme-demo"
+          value: "acmedemo"
         - name: POSTGRES_USERNAME
           valueFrom:
             secretKeyRef:
-              name: postgres
+              name: acme_admin
               key: username
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgres
+              name: pf7E&QvxUJMQFE&j
               key: password
         volumeMounts:
         - name: app-code
