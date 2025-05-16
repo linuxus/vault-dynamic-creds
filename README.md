@@ -147,7 +147,7 @@ vault secrets enable database
 vault write database/config/acme-demo-pg-db \
   plugin_name="postgresql-database-plugin" \
   allowed_roles="acme-demo-role" \
-  connection_url="postgresql://{{username}}:{{password}}@postgres-postgresql.postgres:5432/acme-demo" \
+  connection_url="postgresql://{{username}}:{{password}}@p<your-aws-rds-enpoint>:5432/acme-demo" \
   username="vault" \
   password="vault"
 
