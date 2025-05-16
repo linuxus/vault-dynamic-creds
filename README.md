@@ -131,11 +131,6 @@ chmod +x configure-vault-auth.sh
 ```
 This will set up Vault authentication and verify it works.
 
-Update your deployment:
-```bash
-kubectl apply -f updated-deployment.yaml
-```
-
 Verify everything is working:
 ```bash
 kubectl get vaultdynamicsecret -n acme-demo
