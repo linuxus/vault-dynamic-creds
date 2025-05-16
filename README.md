@@ -121,18 +121,18 @@ Configure Vault's Kubernetes authentication:
 
 Apply the auth resources:
 ```bash
-bashkubectl apply -f vault-auth-resources.yaml
+kubectl apply -f vault-auth-resources.yaml
 ```
 Run the configuration script:
 ```bash
-bashchmod +x configure-vault-auth.sh
+chmod +x configure-vault-auth.sh
 ./configure-vault-auth.sh
 ```
 This will set up Vault authentication and verify it works.
 
 Update your deployment:
 ```bash
-bashkubectl apply -f updated-deployment.yaml
+kubectl apply -f updated-deployment.yaml
 ```
 
 Verify everything is working:
