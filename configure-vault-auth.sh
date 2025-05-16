@@ -4,6 +4,18 @@
 # Exit on error
 set -e
 
+# Check for required parameters
+if [ $# -lt 3 ]; then
+    echo "Usage: $0 <db_username> <db_password> <rds_endpoint>"
+    echo "Example: $0 vault vault123 postgres.example.com"
+    exit 1
+fi
+
+# Get username and password from command line arguments
+DB_USERNAME=$1
+DB_PASSWORD=$2
+RDS_ENDPOINT=$3
+
 echo "Configuring Vault for Kubernetes authentication..."
 
 # 1. Get Kubernetes API server address
@@ -52,6 +64,22 @@ path "database/creds/acme-demo-role" {
 }
 EOF
 fi
+
+# Configure PostgreSQL connection
+vault write database/config/acme-demo-pg-db \
+  plugin_name="postgresql-database-plugin" \
+  allowed_roles="acme-demo-role" \
+  connection_url="postgresql://{{username}}:{{password}}@$RDS_ENDPOINT:5432/acme-demo" \
+  username="$DB_USERNAME" \
+  password="$DB_PASSWORD"
+
+# Create database role
+vault write database/roles/acme-demo-role \
+  db_name="acme-demo-pg-db" \
+  creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+  default_ttl="15m" \
+  max_ttl="30m"
 
 echo "Vault configuration complete!"
 echo "Testing authentication..."

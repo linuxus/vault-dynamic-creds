@@ -81,7 +81,7 @@ If you encounter issues:
    kubectl api-resources | grep vault
    ```
 
-### 2. Set up Vault Authentication
+### 2. Set up Vault Authentication and Database Secrets Engine
 
 Configure Vault's Kubernetes authentication:
 
@@ -104,30 +104,8 @@ kubectl get vaultdynamicsecret -n acme-demo
 kubectl get secret postgres -n acme-demo
 kubectl get pods -n acme-demo
 ```
-### 3. Set up Database Secrets Engine
 
-```bash
-# Enable database secrets engine
-vault secrets enable database
-
-# Configure PostgreSQL connection
-vault write database/config/acme-demo-pg-db \
-  plugin_name="postgresql-database-plugin" \
-  allowed_roles="acme-demo-role" \
-  connection_url="postgresql://{{username}}:{{password}}@p<your-aws-rds-enpoint>:5432/acme-demo" \
-  username="vault" \
-  password="vault"
-
-# Create database role
-vault write database/roles/acme-demo-role \
-  db_name="acme-demo-pg-db" \
-  creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
-      GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
-  default_ttl="15m" \
-  max_ttl="30m"
-```
-
-### 4. Deploy the Application
+### 3. Deploy the Application
 
 Once Vault and the Vault Secret Operator are properly configured, deploy the application:
 
@@ -153,7 +131,7 @@ kubectl get pods -n acme-demo
 kubectl logs -n acme-demo -l app=acme-demo
 ```
 
-### 5. Access the Application
+### 4. Access the Application
 
 The application will be available via:
 
