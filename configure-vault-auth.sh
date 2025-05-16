@@ -36,8 +36,15 @@ TOKEN=$(kubectl create token vault-auth -n vault)
 echo "Extracting Kubernetes CA certificate..."
 kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 --decode > ca.crt
 
-# Enable Kubernetes auth backend
+# Create a Namespace for the Web App deployment
+kubectl create namespace acme-demo
+
+# Create a Service Account for acme-demo-sa
+kubectl create serviceaccount acme-demo-sa -n acme-demo
+
+# Enable Kubernetes auth backend and database engine
 vault auth enable kubernetes
+vault secrets enable database
 
 # 5. Configure Vault
 echo "Configuring Vault Kubernetes auth method..."
@@ -69,7 +76,7 @@ fi
 vault write database/config/acme-demo-pg-db \
   plugin_name="postgresql-database-plugin" \
   allowed_roles="acme-demo-role" \
-  connection_url="postgresql://{{username}}:{{password}}@$RDS_ENDPOINT:5432/acme-demo" \
+  connection_url="postgresql://{{username}}:{{password}}@$RDS_ENDPOINT:5432/acmedemo" \
   username="$DB_USERNAME" \
   password="$DB_PASSWORD"
 
