@@ -72,7 +72,7 @@ NAME                                                        READY   STATUS    RE
 vault-secrets-operator-controller-manager-d6f5df6c7-xj5jf   2/2     Running   0          5m
 ```
 
-#### Manual Installation (Alternative Method)
+#### Manual Installation (Alternative Method) - ONLY if the above step fails
 
 If the Helm installation doesn't work, you can install the CRDs manually:
 
@@ -117,30 +117,30 @@ If you encounter issues:
 ### 2. Set up Vault Authentication
 
 Configure Vault's Kubernetes authentication:
+**NOTE**: Make sure you're authenticated against the EKS cluster before proceeding
 
+Apply the auth resources:
 ```bash
-# Enable Kubernetes auth backend
-vault auth enable kubernetes
+bashkubectl apply -f vault-auth-resources.yaml
+```
+Run the configuration script:
+```bash
+bashchmod +x configure-vault-auth.sh
+./configure-vault-auth.sh
+```
+This will set up Vault authentication and verify it works.
 
-# Configure Kubernetes endpoint
-vault write auth/kubernetes/config \
-  kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"
-
-# Create a Vault policy for database access
-vault policy write acme-demo-policy - <<EOF
-path "database/creds/acme-demo-role" {
-  capabilities = ["read"]
-}
-EOF
-
-# Create a role for the Kubernetes service account
-vault write auth/kubernetes/role/acme-demo-role \
-  bound_service_account_names=acme-demo-sa \
-  bound_service_account_namespaces=acme-demo \
-  policies=acme-demo-policy \
-  ttl=1h
+Update your deployment:
+```bash
+bashkubectl apply -f updated-deployment.yaml
 ```
 
+Verify everything is working:
+```bash
+kubectl get vaultdynamicsecret -n acme-demo
+kubectl get secret postgres -n acme-demo
+kubectl get pods -n acme-demo
+```
 ### 3. Set up Database Secrets Engine
 
 ```bash
@@ -160,8 +160,8 @@ vault write database/roles/acme-demo-role \
   db_name="acme-demo-pg-db" \
   creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
       GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
-  default_ttl="1h" \
-  max_ttl="24h"
+  default_ttl="15m" \
+  max_ttl="30m"
 ```
 
 ### 4. Deploy the Application

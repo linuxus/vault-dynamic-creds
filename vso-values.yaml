@@ -1,0 +1,90 @@
+# Vault Secret Operator Helm Values
+
+# Controller configuration
+controller:
+  # Number of replicas for the operator
+  replicas: 1
+  # Resource limits and requests
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  # Log level for the operator
+  logLevel: info
+  # Service account for the operator
+  serviceAccount:
+    create: true
+    name: "vault-secrets-operator"
+
+# Default Vault connection settings
+defaultVaultConnection:
+  # Enable the default Vault connection
+  enabled: true
+  # Address of your Vault server
+  address: "http://vault-internal.vault.svc.cluster.local:8200"
+  # Skip TLS verification (set to true if using self-signed certs)
+  skipTLSVerify: false
+  # Uncomment to use TLS with CA certificate
+  # caCertSecret: 
+  #   name: "vault-ca-cert"
+  #   key: "ca.crt"
+
+# Default Kubernetes auth mount 
+defaultAuthMethod:
+  enabled: true
+  # Vault Kubernetes auth mount path
+  kubernetes:
+    # Must match the Kubernetes auth mount path in Vault
+    path: "kubernetes"
+    # Service account tokens in k8s 1.24+ are short-lived, so polling and caching is recommended
+    serviceAccount: 
+      # The name of the service account the operator will use to authenticate to Vault
+      name: "vault-secrets-operator"
+    # Kubernetes auth method role
+    role: "vault-secrets-operator-role"
+
+# CRD settings
+crd:
+  # Install CRDs with Helm
+  # Set to true for Helm to manage CRDs
+  enabled: true
+  # Keep CRDs on uninstall
+  keepOnUninstall: true
+
+# Create namespaces needed for our demo
+namespaceOverride: "vault-secrets-operator-system"
+
+# Additional RBAC rules
+rbac:
+  # Create ClusterRole and ClusterRoleBinding
+  create: true
+  # Additional rules for the ClusterRole
+  extraRules:
+    # Allow access to watch secrets, configmaps, and deployments in the acme-demo namespace
+    - apiGroups: [""]
+      resources: ["secrets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["apps"]
+      resources: ["deployments"]
+      verbs: ["get", "list", "watch", "patch"]
+
+# Webhook configurations (useful for validation but optional)
+webhook:
+  # Enable webhook for validating CRDs
+  enabled: true
+  # Webhook service port
+  port: 9443
+  # Certificate settings
+  certManager:
+    enabled: false  # Set to true if you're using cert-manager
+
+# Additional annotations and labels
+commonAnnotations:
+  "app.kubernetes.io/part-of": "vault-integration"
+
+commonLabels:
+  "app.kubernetes.io/component": "secrets-operator"
+  "environment": "demo"
