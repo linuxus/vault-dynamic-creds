@@ -26,21 +26,11 @@ Before deploying the application, you need to install the Vault Secret Operator 
 
 #### Helm Installation (Recommended Method)
 
-The primary method to install Vault Secret Operator with its CRDs is using Helm:
+The primary method to install Vault Secret Operator with its CRDs is using Helm. The install-vso.sh script handles the entire VSO installation process
 
 ```bash
-# Add the HashiCorp Helm repository
-helm repo add hashicorp https://helm.releases.hashicorp.com
-helm repo update
-
-# Create the namespace for VSO
-kubectl create namespace vault-secrets-operator-system
-
-# Install Vault Secret Operator with your vso-values.yaml
-helm install vault-secrets-operator hashicorp/vault-secrets-operator \
-    -n vault-secrets-operator-system \
-    --create-namespace \
-    --values vso-values.yaml
+chmod +x install-vso.sh
+./install-vso.sh
 ```
 
 #### Verification Steps
@@ -70,29 +60,6 @@ You should see output like:
 ```
 NAME                                                        READY   STATUS    RESTARTS   AGE
 vault-secrets-operator-controller-manager-d6f5df6c7-xj5jf   2/2     Running   0          5m
-```
-
-#### Manual Installation (Alternative Method) - ONLY if the above step fails
-
-If the Helm installation doesn't work, you can install the CRDs manually:
-
-```bash
-# Clone the Vault Secret Operator repository
-git clone https://github.com/hashicorp/vault-secrets-operator.git
-cd vault-secrets-operator
-
-# Install the CRDs directly
-kubectl apply -f config/crd/bases/
-```
-
-Then install the operator without CRDs:
-
-```bash
-helm install vault-secrets-operator hashicorp/vault-secrets-operator \
-    -n vault-secrets-operator-system \
-    --create-namespace \
-    --set "installCRDs=false" \
-    --values vso-values.yaml
 ```
 
 #### Troubleshooting Installation
@@ -311,6 +278,17 @@ psql --host=localhost --port=5432 --username=<admin-user> --dbname=<db-name>
 - **IAM Permissions**: Ensure the EC2 instances have only the necessary IAM permissions
 - **Audit Logging**: Enable audit logging in Vault to track credential generation and usage
 
+## Cleanup
+### Remove VSO and CRDs from the Kubernetes cluster
+``` bash
+chmod +x uninstall-vso.sh
+./uninstall-vso.sh
+```
+### Deleting All Resources Created from Kubernetes Manifests including the Web App
+``` bash
+kubectl delete -f vault-auth-resources.yaml
+kubectl delete -f kubernetes-manifests.yaml
+```
 ## References
 
 - [HashiCorp Vault Documentation](https://www.vaultproject.io/docs)
