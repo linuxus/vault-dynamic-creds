@@ -117,6 +117,7 @@ If you encounter issues:
 ### 2. Set up Vault Authentication
 
 Configure Vault's Kubernetes authentication:
+
 **NOTE**: Make sure you're authenticated against the EKS cluster before proceeding
 
 Apply the auth resources:
